@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Equipos</title>
+</head>
+<body>
+  <h1>Equipos</h1>
+
+  <form method="GET" action="/equipos">
+    <label>Nombre: <input type="text" name="q" value="<%= filtros.q %>"></label>
+
+    <label>Categoría:
+      <select name="categoria">
+        <option value="">Todas</option>
+        <% categorias.forEach(c => { %>
+          <option value="<%= c %>" <%= c === filtros.categoria ? 'selected' : '' %>><%= c %></option>
+        <% }) %>
+      </select>
+    </label>
+
+    <label>Estado:
+      <select name="disponible">
+        <option value="">Todos</option>
+        <option value="true"  <%= filtros.disponible === 'true'  ? 'selected' : '' %>>Disponible</option>
+        <option value="false" <%= filtros.disponible === 'false' ? 'selected' : '' %>>Prestado</option>
+      </select>
+    </label>
+
+    <label>Ordenar por:
+      <select name="orden">
+        <option value="codigo" <%= filtros.orden === 'codigo' ? 'selected' : '' %>>Código</option>
+        <option value="nombre" <%= filtros.orden === 'nombre' ? 'selected' : '' %>>Nombre</option>
+      </select>
+    </label>
+
+    <button type="submit">Buscar</button>
+  </form>
+
+  <% if (filas.length === 0) { %>
+    <p>No se han encontrado equipos con esos criterios.</p>
+  <% } else { %>
+    <table border="1">
+      <thead>
+        <tr><th>Código</th><th>Nombre</th><th>Categoría</th><th>Estado</th></tr>
+      </thead>
+      <tbody>
+        <% filas.forEach(f => { %>
+          <tr>
+            <td><%= f.codigo %></td>
+            <td><a href="/equipos/<%= f.id %>"><%= f.nombre %></a></td>
+            <td><%= f.categoria %></td>
+            <td><%= f.disponible ? 'Disponible' : 'Prestado' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <nav>
+      <% if (pagina > 1) { %><a href="<%= enlace(pagina - 1) %>">Anterior</a><% } %>
+      Página <%= pagina %> de <%= totalPaginas %> (<%= total %> equipos)
+      <% if (pagina < totalPaginas) { %><a href="<%= enlace(pagina + 1) %>">Siguiente</a><% } %>
+    </nav>
+  <% } %>
+</body>
+</html>

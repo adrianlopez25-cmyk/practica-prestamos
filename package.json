@@ -1,0 +1,16 @@
+{
+  "name": "practica-prestamos",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node --env-file=.env src/server.mjs",
+    "pruebas": "node pruebas.mjs"
+  },
+  "engines": { "node": ">=24" },
+  "dependencies": {
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "pg": "^8.16.0"
+  }
+}
