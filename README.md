@@ -205,3 +205,7 @@ wait
 - Sin autenticación ni CSS.
 - Las rutas HTML devuelven errores en JSON (no hay página de error).
 - No hay endpoints para gestionar usuarios (se crean en `init.sql`).
+
+## Chat con la IA
+
+https://gemini.google.com/share/d/1Vb1dZcTnPtX7GyU7Z2ha0nNk2DYeae_s?usp=sharing
