@@ -66,6 +66,141 @@ Con el servidor arrancado: `npm run pruebas` (usa `fetch`; la simultaneidad con 
 | Equipo inexistente | GET /equipos/999999 | 404 | 404 |
 | Filtros | `/equipos?q=port&orden=nombre`, `?disponible=false&categoria=Proyector` | resultados filtrados / mensaje sin resultados | correcto |
 
+## Pruebas manuales con curl
+
+Con el servidor arrancado y la base recién inicializada (`docker compose down -v && docker compose up -d`).
+Cada bloque indica la petición y el resultado esperado.
+
+### Alta y modificación
+```bash
+# Alta correcta -> 201 y cabecera Location
+curl -i -X POST http://localhost:3000/api/equipos \
+  -H "Content-Type: application/json" \
+  -d '{"codigo":"TEST-01","nombre":"Equipo de prueba","categoria":"Prueba"}'
+
+# Código repetido -> 409
+curl -i -X POST http://localhost:3000/api/equipos \
+  -H "Content-Type: application/json" \
+  -d '{"codigo":"TEST-01","nombre":"Repetido","categoria":"Prueba"}'
+
+# Modificación correcta -> 200 (sustituye 12 por el id devuelto en el alta)
+curl -i -X PUT http://localhost:3000/api/equipos/12 \
+  -H "Content-Type: application/json" \
+  -d '{"codigo":"TEST-01","nombre":"Equipo modificado","categoria":"Prueba"}'
+
+# Modificar un id inexistente -> 404
+curl -i -X PUT http://localhost:3000/api/equipos/999999 \
+  -H "Content-Type: application/json" \
+  -d '{"codigo":"X","nombre":"X","categoria":"X"}'
+```
+
+### Validación (errores 400)
+```bash
+# JSON mal formado -> 400
+curl -i -X POST http://localhost:3000/api/equipos \
+  -H "Content-Type: application/json" -d '{malo'
+
+# Campo vacío -> 400
+curl -i -X POST http://localhost:3000/api/equipos \
+  -H "Content-Type: application/json" \
+  -d '{"codigo":"","nombre":"x","categoria":"y"}'
+
+# Código con más de 20 caracteres -> 400
+curl -i -X POST http://localhost:3000/api/equipos \
+  -H "Content-Type: application/json" \
+  -d '{"codigo":"123456789012345678901","nombre":"x","categoria":"y"}'
+
+# Id no numérico -> 400
+curl -i http://localhost:3000/equipos/abc
+
+# Ids de préstamo que no son enteros -> 400
+curl -i -X POST http://localhost:3000/api/prestamos \
+  -H "Content-Type: application/json" \
+  -d '{"equipoId":"1","usuarioId":1}'
+```
+
+### Consulta y filtros
+```bash
+# Búsqueda por nombre (ILIKE) -> solo los 3 portátiles
+curl -s "http://localhost:3000/equipos?q=port"
+
+# Filtro por categoría -> solo los 2 monitores
+curl -s "http://localhost:3000/equipos?categoria=Monitor"
+
+# Filtro por disponibilidad -> solo equipos prestados
+curl -s "http://localhost:3000/equipos?disponible=false"
+
+# Ordenación por nombre
+curl -s "http://localhost:3000/equipos?orden=nombre"
+
+# Segunda página -> 5 equipos distintos de la primera
+curl -s "http://localhost:3000/equipos?pagina=2"
+
+# Sin resultados -> mensaje "No se han encontrado equipos..."
+curl -s "http://localhost:3000/equipos?q=zzz"
+
+# Intento de inyección en el orden -> ordena por código, sin error
+curl -s "http://localhost:3000/equipos?orden=nombre;DROP%20TABLE%20equipos"
+```
+
+### Préstamo, duplicado y rollback
+```bash
+# Préstamo correcto -> 201 (el equipo pasa a no disponible)
+curl -i -X POST http://localhost:3000/api/prestamos \
+  -H "Content-Type: application/json" \
+  -d '{"equipoId":1,"usuarioId":1}'
+
+# Mismo equipo otra vez -> 409, sin duplicar filas
+curl -i -X POST http://localhost:3000/api/prestamos \
+  -H "Content-Type: application/json" \
+  -d '{"equipoId":1,"usuarioId":2}'
+
+# Equipo inexistente -> 404
+curl -i -X POST http://localhost:3000/api/prestamos \
+  -H "Content-Type: application/json" \
+  -d '{"equipoId":9999,"usuarioId":1}'
+
+# Rollback: usuario inexistente -> 404; el equipo 2 sigue disponible
+curl -i -X POST http://localhost:3000/api/prestamos \
+  -H "Content-Type: application/json" \
+  -d '{"equipoId":2,"usuarioId":9999}'
+curl -s http://localhost:3000/equipos/2     # debe mostrar "Disponible" y sin préstamos
+```
+
+### Devolución
+```bash
+# Devolución correcta -> 200 con fecha_devolucion rellena
+curl -i -X POST http://localhost:3000/api/prestamos/1/devolucion
+
+# Segunda devolución -> 409, sin modificar nada
+curl -i -X POST http://localhost:3000/api/prestamos/1/devolucion
+
+# Préstamo inexistente -> 404
+curl -i -X POST http://localhost:3000/api/prestamos/9999/devolucion
+```
+
+### Borrado
+```bash
+# Equipo con historial (el 1 ya tiene préstamos) -> 409
+curl -i -X DELETE http://localhost:3000/api/equipos/1
+
+# Equipo sin historial (el 3, nunca prestado) -> 204
+curl -i -X DELETE http://localhost:3000/api/equipos/3
+
+# Mismo id otra vez -> 404
+curl -i -X DELETE http://localhost:3000/api/equipos/3
+```
+
+### Simultaneidad
+```bash
+# Dos préstamos a la vez del mismo equipo -> uno 201 y otro 409
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:3000/api/prestamos \
+  -H "Content-Type: application/json" -d '{"equipoId":4,"usuarioId":1}' &
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:3000/api/prestamos \
+  -H "Content-Type: application/json" -d '{"equipoId":4,"usuarioId":2}' &
+wait
+```
+
 ## Limitaciones conocidas
 - Sin autenticación ni CSS.
 - Las rutas HTML devuelven errores en JSON (no hay página de error).
